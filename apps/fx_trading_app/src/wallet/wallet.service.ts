@@ -11,10 +11,16 @@ import { FxService } from "../fx/fx.service"; // Assuming the fx service is loca
 import { IdempotencyService } from "./idempotency.service";
 import { User } from "../users/user.entities";
 import { ConvertCurrencyDto } from "./dto/convert-currency-dto";
+import { CreateWalletDto } from "./dto/create-wallet.dto";
+import { SupportedCurrency } from "./enum/SupportedCurrency.enum";
 
 @Injectable()
 export class WalletService {
   constructor(
+
+    @InjectRepository(WalletBalance)
+    private walletBalanceRepo: Repository<WalletBalance>,
+
     @InjectRepository(Wallet)
     private walletRepo: Repository<Wallet>,
 
@@ -30,7 +36,7 @@ export class WalletService {
     @Inject(IdempotencyService)
     private idempotencyService: IdempotencyService,
 
-    private fxService: FxService, // Inject fxService
+    private fxService: FxService,
   ) {}
 
   async fundWallet(dto: FundWalletDto) {
@@ -40,19 +46,33 @@ export class WalletService {
         relations: ['wallets'],
       });
   
-      if (!user) {
-        throw new NotFoundException('User not found');
+      if (!user) throw new NotFoundException('User not found');
+  
+      // Get the first wallet (or select the relevant one)
+      const wallet = user.wallets[0];  // Assuming user has at least one wallet
+      if (!wallet) throw new NotFoundException('Wallet not found');
+  
+      // Check if the wallet balance exists for the given currency
+      let walletBalance = await this.walletBalanceRepo.findOne({
+        where: { wallet: { id: wallet.id }, currency: dto.currency },
+      });
+  
+      // If no balance exists for that currency, create a new one
+      if (!walletBalance) {
+        walletBalance = this.walletBalanceRepo.create({
+          wallet,
+          currency: dto.currency,
+          amount: 0,
+        });
       }
-      const wallet = user.wallets[0];
   
-      if (!wallet) {
-        throw new NotFoundException('Wallet not found');
-      }
+      // Update the balance for the given currency
+      walletBalance.amount += dto.amount;
   
-      wallet[dto.currency] += dto.amount;
+      // Save the updated wallet balance
+      await this.walletBalanceRepo.save(walletBalance);
   
-      await this.walletRepo.save(wallet);
-  
+      // Create the transaction for this fund operation
       const tx = this.txRepo.create({
         wallet,
         currency: dto.currency,
@@ -60,13 +80,62 @@ export class WalletService {
         type: 'FUND',
         status: 'SUCCESS',
         rateUsed: 1,
-      }as DeepPartial<Transaction>);
+      } as DeepPartial<Transaction>);
   
+      // Save the transaction to the database
       await this.txRepo.save(tx);
   
       return { message: 'Wallet funded successfully.' };
     });
   }
+  
+    
+
+  async createWallet(dto: CreateWalletDto): Promise<{ message: string }> {
+    const user = await this.userRepo.findOne({
+      where: { id: dto.userId },
+      relations: ['wallets'],
+    });
+  
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+  
+    const existingWallet = await this.walletRepo.findOne({
+      where: { user: { id: dto.userId } },
+    });
+  
+    if (existingWallet) {
+      throw new BadRequestException('Wallet already exists for user');
+    }
+  
+    const newWallet = this.walletRepo.create({
+      user,
+      currency: dto.currency,
+      balances: {},
+    });
+  
+    await this.walletRepo.save(newWallet);
+  
+    const initialCurrencies: SupportedCurrency[] = [
+      SupportedCurrency.USD,
+      SupportedCurrency.NGN,
+      SupportedCurrency.EUR,
+    ];
+      
+    const balances = initialCurrencies.map((currency) =>
+      this.balanceRepo.create({
+        wallet: newWallet,
+        currency,
+        amount: 0,
+      })
+    );
+  
+    await this.balanceRepo.save(balances);
+  
+    return { message: 'Wallet created successfully with initial currencies.' };
+  }
+  
   
   async convertCurrency(dto: ConvertCurrencyDto) {
     if (dto.from === dto.to)
@@ -155,16 +224,16 @@ export class WalletService {
     const fxRate = await this.fxService.getRate(fromCurrency, toCurrency);
     const toAmount = amount * fxRate;
   
-    const fromBalance = wallet.balance[fromCurrency] || 0;
-    const toBalance = wallet.balance[toCurrency] || 0;
+    const fromBalance = wallet.balances[fromCurrency] || 0;
+    const toBalance = wallet.balances[toCurrency] || 0;
   
     if (fromBalance < amount) {
       throw new BadRequestException('Insufficient funds for trade');
     }
   
     // Update balances
-    wallet.balance[fromCurrency] = fromBalance - amount;
-    wallet.balance[toCurrency] = toBalance + toAmount;
+    wallet.balances[fromCurrency] = fromBalance - amount;
+    wallet.balances[toCurrency] = toBalance + toAmount;
   
     const debitTx = this.txRepo.create({
       wallet,
@@ -191,28 +260,30 @@ export class WalletService {
   }
 
   async getWalletBalances(userId: string) {
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['wallets'],
-    });
-  
-    if (!user || !user.wallets?.length) {
-      throw new NotFoundException('User or wallets not found');
-    }
-  
-    const aggregatedBalances: Record<string, number> = {};
-  
-    for (const wallet of user.wallets) {
-      for (const [currency, amount] of Object.entries(wallet.balance || {})) {
-        if (!aggregatedBalances[currency]) {
-          aggregatedBalances[currency] = 0;
-        }
-        aggregatedBalances[currency] += amount;
-      }
-    }
-  
-    return aggregatedBalances;
+  const user = await this.userRepo.findOne({
+    where: { id: userId },
+    relations: ['wallets'],
+  });
+
+  if (!user || !user.wallets?.length) {
+    throw new NotFoundException('User or wallets not found');
   }
-  
-  
+
+  const aggregatedBalances: Record<string, number> = {};
+
+  for (const wallet of user.wallets) {
+    const walletBalances = await this.walletBalanceRepo.find({
+      where: { wallet: { id: wallet.id } },
+    });
+
+    for (const walletBalance of walletBalances) {
+      if (!aggregatedBalances[walletBalance.currency]) {
+        aggregatedBalances[walletBalance.currency] = 0;
+      }
+      aggregatedBalances[walletBalance.currency] += walletBalance.amount;
+    }
+  }
+
+  return aggregatedBalances;
+}
 }

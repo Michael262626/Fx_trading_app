@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, OneToMany, Column, ManyToOne } from 'typeorm';
 import { Transaction } from '../../transaction/entities/transaction.entities';
 import { User } from '../../users/user.entities';
+import { WalletBalance } from './wallet-balance.entities';
 
 @Entity()
 export class Wallet {
@@ -13,8 +14,8 @@ export class Wallet {
   @Column({ type: 'varchar' })
   currency: string;
 
-  @Column('jsonb', { nullable: false, default: '{}' })
-  balance: Record<string, number>; 
+  @OneToMany(() => WalletBalance, walletBalance => walletBalance.wallet)
+  balances: Record<string, number>;
 
   @OneToMany(() => Transaction, transaction => transaction.wallet) // Bidirectional relationship
   transactions: Transaction[];

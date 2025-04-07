@@ -23,14 +23,13 @@ export class FxService {
 
     return rate;
   }
-
   private async fetchFromAPI(from: string, to: string): Promise<number> {
-    // Replace with your actual FX API logic
-    const url = `https://v6.exchangerate-api.com/v6/${process.env.FX_API_KEY}/pair/${from}/${to}`;
-    
-    const response = await firstValueFrom(this.httpService.get(url));
-    const data = response.data as { conversion_rate: number }; // Type assertion
+    // Correct URL structure for the API
+    const url = `https://api.exchangeratesapi.io/v1/latest?access_key=${process.env.FX_API_KEY}&base=${from}&symbols=${to}`;
 
-    return data?.conversion_rate;
-  }
+    const response = await firstValueFrom(this.httpService.get(url));
+    const data = response.data as { rates: { [key: string]: number } }; 
+
+    return data?.rates[to]; 
+}
 }

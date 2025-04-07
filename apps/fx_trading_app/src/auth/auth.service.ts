@@ -42,34 +42,39 @@ export class AuthService {
 
   // Generate and send OTP to the user
   async sendOtp(email: string): Promise<void> {
-    const otp = randomInt(100000, 999999).toString(); // Generate a random 6-digit OTP
-    const otpExpiry = Date.now() + 5 * 60 * 1000; // OTP expiry set to 5 minutes
+    const otp = randomInt(100000, 999999).toString(); 
+    const otpExpiry = Date.now() + 5 * 60 * 1000;
 
     const storedOtp: StoredOtp = { otp, expiry: otpExpiry };
-    this.otpStore.set(email, storedOtp); // Store OTP and expiry in memory
-
-    await this.emailService.sendOtpEmail(email, otp); // Send OTP to user's email
+    this.otpStore.set(email, storedOtp); 
+    await this.emailService.sendOtpEmail(email, otp); 
   }
 
-  // Verify OTP
   async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<boolean> {
     const { otp, email } = verifyOtpDto;
     const storedOtp = this.otpStore.get(email);
-  
+
     if (storedOtp) {
-      // Check if OTP has expired
       if (storedOtp.expiry < Date.now()) {
-        this.otpStore.delete(email); // Remove expired OTP
+        this.otpStore.delete(email);
         return false;
       }
   
-      // Verify OTP
       if (storedOtp.otp === otp) {
-        this.otpStore.delete(email); // Remove OTP after successful verification
+        this.otpStore.delete(email);
+  
+        const user = await this.userRepo.findOne({ where: { email } });
+        if (user) {
+          user.isVerified = true;
+          await this.userRepo.save(user);
+        }
+  
         return true;
       }
     }
+  
     return false;
   }
+  
   
 }

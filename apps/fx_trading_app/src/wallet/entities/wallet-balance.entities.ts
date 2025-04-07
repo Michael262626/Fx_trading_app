@@ -6,7 +6,7 @@ export class WalletBalance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Wallet, { eager: true })
+  @ManyToOne(() => Wallet, wallet => wallet.balances)
   wallet: Wallet;
 
   @Column()

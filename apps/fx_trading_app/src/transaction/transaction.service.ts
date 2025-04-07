@@ -28,9 +28,10 @@ export class Transactionservice {
       .createQueryBuilder('tx')
       .where('tx.walletId = :walletId', { walletId: wallet.id });
   
-    if (type) query.andWhere('tx.type = :type', { type });
+    if (type !== undefined) {
+      query.andWhere('tx.type = :type', { type });
+    }
   
     return query.orderBy('tx.createdAt', 'DESC').getMany();
-  }
-
+  }  
 }
