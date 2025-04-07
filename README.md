@@ -1,99 +1,83 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# NestJS Auth Service with OTP Verification
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This service handles user registration with OTP-based email verification using **NestJS**, **TypeORM**, and **PostgreSQL**. It includes the ability to:
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- Register new users
+- Hash and store passwords
+- Send a One-Time Password (OTP) via email
+- Verify OTPs to activate users
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+##  Technologies Used
 
-## Project setup
+- **NestJS** – A progressive Node.js framework
+- **TypeORM** – ORM for data access
+- **PostgreSQL** – Relational database
+- **Jest** – Unit testing
+- **bcrypt** – Password hashing
+- **Node.js crypto** – Random OTP generation
 
-```bash
-$ npm install
-```
+---
+## Features
 
-## Compile and run the project
+### 1. **User Registration & Email Verification**
+- **POST** `/auth/register`: Register a new user with their name, email, and password.
+- **POST** `/auth/verify`: Verify OTP sent to the user's email to activate the account.
+- OTPs are valid for **5 minutes** and are stored temporarily in-memory using a `Map`.
 
-```bash
-# development
-$ npm run start
+### 2. **Wallet Management**
+- Users will have wallets that support multiple currencies (NGN, USD, EUR, etc.).
+- Wallets start with an initial balance in NGN and can be funded in different currencies.
+- Users can convert between currencies using real-time FX rates.
 
-# watch mode
-$ npm run start:dev
+### 3. **Currency Conversion & Trading**
+- Users can trade between **NGN** and **other currencies** (USD, EUR, GBP, etc.).
+- Currency conversion happens using real-time FX rates fetched from an external API.
 
-# production mode
-$ npm run start:prod
-```
+### 4. **Transaction History**
+- Users' actions (funding wallet, conversion, trading) are logged.
+- Transaction history includes details like amount, rate, type, timestamp, and status.
 
-## Run tests
+### 5. **Caching Fx rates**
+- Implement caching for FX rates using Redis or a similar in-memory store. Cache the rates for a short   period   to reduce the frequency of external API calls. This reduces the load on both the FX API and our system while ensuring relatively up-to-date rates.
 
-```bash
-# unit tests
-$ npm run test
+- Fallback mechanism: In case the external FX API is down or rate limits are exceeded, use previously cached rates or fall back to a secondary source for rate data.
 
-# e2e tests
-$ npm run test:e2e
+- Rate expiration: Ensure cached FX rates expire after a short time (e.g., 1-2 minutes) to keep the rates up-to-date.
+---
 
-# test coverage
-$ npm run test:cov
-```
 
-## Deployment
+- OTP is valid for **5 minutes**
+- OTPs are stored **in-memory** using a `Map`
+- Only **email** is used for user verification
+- Email sending is abstracted via `EmailService`
+- Passwords are hashed with **bcrypt**
+- `User` entity has an `isVerified` flag
+- Verification does not require login/session
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
 
-```bash
-$ npm install -g mau
-$ mau deploy
-```
+### 1. **Register a new user**
+- **POST** `/auth/register`
+- **Body:**
+  ```json
+  {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "securePassword"
+  }
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+  # Install dependencies
+  npm install
 
-## Resources
+# Create .env and configure DB
+cp .env.example .env
 
-Check out a few resources that may come in handy when working with NestJS:
+# Run DB migrations (if any)
+npm run typeorm migration:run
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Start the app
+npm run start:dev
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-"# Fx_trading_app" 
