@@ -48,16 +48,13 @@ export class WalletService {
   
       if (!user) throw new NotFoundException('User not found');
   
-      // Get the first wallet (or select the relevant one)
       const wallet = user.wallets[0];  // Assuming user has at least one wallet
       if (!wallet) throw new NotFoundException('Wallet not found');
   
-      // Check if the wallet balance exists for the given currency
       let walletBalance = await this.walletBalanceRepo.findOne({
         where: { wallet: { id: wallet.id }, currency: dto.currency },
       });
   
-      // If no balance exists for that currency, create a new one
       if (!walletBalance) {
         walletBalance = this.walletBalanceRepo.create({
           wallet,
@@ -66,13 +63,10 @@ export class WalletService {
         });
       }
   
-      // Update the balance for the given currency
       walletBalance.amount += dto.amount;
   
-      // Save the updated wallet balance
       await this.walletBalanceRepo.save(walletBalance);
   
-      // Create the transaction for this fund operation
       const tx = this.txRepo.create({
         wallet,
         currency: dto.currency,
@@ -82,7 +76,6 @@ export class WalletService {
         rateUsed: 1,
       } as DeepPartial<Transaction>);
   
-      // Save the transaction to the database
       await this.txRepo.save(tx);
   
       return { message: 'Wallet funded successfully.' };
